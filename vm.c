@@ -163,8 +163,8 @@ int main(int argc, char *argv[]) {
 	memset(memory, 0, sizeof(memory));
 
 	fp = fopen(argv[1], "rb");
-	while (!feof(binary)) {
-		fread(&n, sizeof(uint16_t), 1, binary);
+	while (!feof(fp)) {
+		fread(&n, sizeof(uint16_t), 1, fp);
 		setmem(o++, n);
 	}
 
