@@ -190,7 +190,6 @@ int main(int argc, char *argv[]) {
 	load_file_to_memory(fp);
 	fclose(fp);
 
-	//dumpmem(592, 20);
 	stack_init();
 	execute();
 
@@ -295,7 +294,7 @@ void op_out(void) {
 }
 
 void op_in(void) {
-	setmem(getarg(1), getchar());
+	setmem(getrarg(1), getchar());
 	OFFSET += 2;
 }
 
