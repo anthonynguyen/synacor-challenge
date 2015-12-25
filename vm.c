@@ -1,9 +1,9 @@
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
-typedef unsigned short u16;
-u16 memory[32767 + 8]; // +8 for the registers
+uint16_t memory[32767 + 8]; // +8 for the registers
 
 int OFFSET;
 
@@ -52,7 +52,7 @@ void stack_print(void) {
 	printf("\n");
 }
 
-void push(u16 value) {
+void push(uint16_t value) {
 	node *cur = head;
 	while (cur->next != NULL)
 		cur = cur->next;
@@ -62,10 +62,10 @@ void push(u16 value) {
 	cur->next->next = NULL;
 }
 
-u16 pop(void) {
+uint16_t pop(void) {
 	node *cur = head;
 	node *prev;
-	u16 r;
+	uint16_t r;
 
 	while (cur->next != NULL) {
 		prev = cur;
@@ -81,35 +81,35 @@ u16 pop(void) {
 	return r;
 }
 
-u16 getmem(u16 address) {
+uint16_t getmem(uint16_t address) {
 	return memory[address];
 }
 
-u16 getrarg(int n) {
+uint16_t getrarg(int n) {
 	return getmem(OFFSET + n);
 }
 
-u16 getarg(int n) {
-	u16 v = getrarg(n);
+uint16_t getarg(int n) {
+	uint16_t v = getrarg(n);
 	if (v > 32767)
 		return getmem(v);
 	return v;
 }
 
-void setmem(u16 address, u16 value) {
+void setmem(uint16_t address, uint16_t value) {
 	memory[address] = value;
 }
 
 void load_file_to_memory(FILE *binary) {
 	int o = 0;
-	u16 n;
+	uint16_t n;
 	while (!feof(binary)) {
-		fread(&n, sizeof(u16), 1, binary);
+		fread(&n, sizeof(uint16_t), 1, binary);
 		setmem(o++, n);
 	}
 }
 
-void (*runop(u16 opcode))(void) {
+void (*runop(uint16_t opcode))(void) {
 	switch (opcode) {
 		case 0:
 			return &op_halt;
@@ -160,7 +160,7 @@ void (*runop(u16 opcode))(void) {
 }
 
 void execute(void) {
-	u16 opcode;
+	uint16_t opcode;
 
 	for (OFFSET = 0;;) {
 		opcode = getmem(OFFSET);
@@ -263,7 +263,7 @@ void op_or(void) {
 }
 
 void op_not(void) {
-	setmem(getrarg(1), getarg(2) ^ 0x7FFF);
+	setmem(getrarg(1), getarg(2) ^ 32767);
 	OFFSET += 3;
 }
 
@@ -283,7 +283,7 @@ void op_call(void) {
 }
 
 void op_ret(void) {
-	u16 nxop = pop();
+	uint16_t nxop = pop();
 	if (nxop < 0) op_halt();
 	OFFSET = nxop;
 }
