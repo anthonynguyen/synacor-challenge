@@ -7,6 +7,13 @@ uint16_t memory[32767 + 8]; // +8 for the registers
 
 int OFFSET;
 
+typedef struct node {
+	int value;
+	struct node *next;
+} node;
+
+node *head;
+
 void op_halt(void);
 void op_set(void);
 void op_push(void);
@@ -30,26 +37,10 @@ void op_out(void);
 void op_in(void);
 void op_noop(void);
 
-typedef struct node {
-	int value;
-	struct node *next;
-} node;
-
-node *head;
-
 void stack_init(void) {
 	head = (node *)malloc(sizeof(node));
 	head->value = -1;
 	head->next = NULL;
-}
-
-void stack_print(void) {
-	node *cur = head;
-	while (cur) {
-		printf("%i, ", cur->value);
-		cur = cur->next;
-	}
-	printf("\n");
 }
 
 void push(uint16_t value) {
@@ -81,6 +72,10 @@ uint16_t pop(void) {
 	return r;
 }
 
+void setmem(uint16_t address, uint16_t value) {
+	memory[address] = value;
+}
+
 uint16_t getmem(uint16_t address) {
 	return memory[address];
 }
@@ -94,19 +89,6 @@ uint16_t getarg(int n) {
 	if (v > 32767)
 		return getmem(v);
 	return v;
-}
-
-void setmem(uint16_t address, uint16_t value) {
-	memory[address] = value;
-}
-
-void load_file_to_memory(FILE *binary) {
-	int o = 0;
-	uint16_t n;
-	while (!feof(binary)) {
-		fread(&n, sizeof(uint16_t), 1, binary);
-		setmem(o++, n);
-	}
 }
 
 void (*runop(uint16_t opcode))(void) {
@@ -168,16 +150,10 @@ void execute(void) {
 	}
 }
 
-void dumpmem(int s, int e) {
-	int i;
-
-	for (i = s; i <= s + e; i++) {
-		printf("[%i] %u\n", i, getmem(i));
-	}
-}
-
 int main(int argc, char *argv[]) {
 	FILE *fp;
+	int o = 0;
+	uint16_t n;
 
 	if (argc < 2) {
 		printf("Usage: vm <binary>\n");
@@ -187,7 +163,11 @@ int main(int argc, char *argv[]) {
 	memset(memory, 0, sizeof(memory));
 
 	fp = fopen(argv[1], "rb");
-	load_file_to_memory(fp);
+	while (!feof(binary)) {
+		fread(&n, sizeof(uint16_t), 1, binary);
+		setmem(o++, n);
+	}
+
 	fclose(fp);
 
 	stack_init();
