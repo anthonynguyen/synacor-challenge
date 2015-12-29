@@ -43,6 +43,15 @@ void stack_init(void) {
 	head->next = NULL;
 }
 
+void stack_print(void) {
+	node *cur = head;
+	while (cur) {
+		printf("%i, ", cur->value);
+		cur = cur->next;
+	}
+	printf("\n");
+}
+
 uint16_t stack_length(void) {
 	node *cur = head->next;
 	uint16_t length = 0;
@@ -198,7 +207,6 @@ void save_state(int timestamp) {
 	fclose(fp);
 
 	printf("Saved vm state to %s\n", fname);
-	return;
 }
 
 void load_state(char *fname) {
@@ -207,12 +215,11 @@ void load_state(char *fname) {
 	uint16_t stacklen, n;
 
 	fname[strlen(fname) - 1] = 0;
-	printf("Loading vm state from %s\n", fname);
 
 	fp = fopen(fname, "rb");
 	fread(&OFFSET, sizeof(uint16_t), 1, fp);
 
-	stack_init(); // Yes, this leaks. No, I don't care
+	stack_init();
 	fread(&stacklen, sizeof(uint16_t), 1, fp);
 	for (i = 0; i < stacklen; i++) {
 		fread(&n, sizeof(uint16_t), 1, fp);
@@ -221,12 +228,12 @@ void load_state(char *fname) {
 
 	fclose(fp);
 
-	skip = sizeof(uint16_t) * (stacklen + 1);
+	skip = sizeof(uint16_t) * (stacklen + 2);
 	load_file_to_memory(fname, skip);
-	return;
+	printf("Loaded vm state from %s\n", fname);
 }
 
-void vm_shell(void) {
+int vm_shell(void) {
 	char buffer[1024] = {0};
 	int t;
 	getchar();
@@ -238,13 +245,15 @@ void vm_shell(void) {
 			save_state((unsigned)time(NULL));
 		} else if (!strncmp(buffer, "load ", 4)) {
 			load_state(buffer + 5);
-			execute();
+			return 1;
 		} else if (!strncmp(buffer, "exit", 4)) {
 			break;
 		} else {
 			printf("Invalid vm command\n");
 		}
 	}
+
+	return 0;
 }
 
 int main(int argc, char *argv[]) {
@@ -363,7 +372,9 @@ void op_in(void) {
 	char c = getchar();
 
 	if (c == '~') {
-		vm_shell();
+		if (vm_shell())
+			return;
+
 		setmem(getrarg(1), getchar());
 	} else {
 		setmem(getrarg(1), c);
