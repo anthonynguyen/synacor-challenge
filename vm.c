@@ -5,7 +5,7 @@
 
 uint16_t memory[32767 + 8]; // +8 for the registers
 
-int OFFSET;
+uint16_t OFFSET;
 
 typedef struct node {
 	int value;
@@ -41,6 +41,18 @@ void stack_init(void) {
 	head = (node *)malloc(sizeof(node));
 	head->value = -1;
 	head->next = NULL;
+}
+
+uint16_t stack_length(void) {
+	node *cur = head->next;
+	uint16_t length = 0;
+
+	while (cur != NULL) {
+		length++;
+		cur = cur->next;
+	}
+
+	return length;
 }
 
 void push(uint16_t value) {
@@ -144,32 +156,106 @@ void (*runop(uint16_t opcode))(void) {
 void execute(void) {
 	uint16_t opcode;
 
-	for (OFFSET = 0;;) {
+	for (;;) {
 		opcode = getmem(OFFSET);
 		runop(opcode)();
 	}
 }
 
-int main(int argc, char *argv[]) {
+void load_file_to_memory(char *fname, int skip) {
 	FILE *fp;
 	int o = 0;
 	uint16_t n;
 
-	if (argc < 2) {
-		printf("Usage: vm <binary>\n");
-		return 1;
-	}
-
 	memset(memory, 0, sizeof(memory));
-
-	fp = fopen(argv[1], "rb");
+	fp = fopen(fname, "rb");
+	fseek(fp, skip, SEEK_SET);
 	while (!feof(fp)) {
 		fread(&n, sizeof(uint16_t), 1, fp);
 		setmem(o++, n);
 	}
 
 	fclose(fp);
+}
 
+void save_state(int timestamp) {
+	char fname[21];
+	int stacklen = stack_length();
+	node *cur = head->next;
+	FILE *fp;
+	sprintf(fname, "state_%u.bin", timestamp);
+
+	fp = fopen(fname, "wb");
+	fwrite(&OFFSET, sizeof(uint16_t), 1, fp);
+
+	fwrite(&stacklen, sizeof(uint16_t), 1, fp);
+	while (cur != NULL) {
+		fwrite(&cur->value, sizeof(uint16_t), 1, fp);
+		cur = cur->next;
+	}
+
+	fwrite(memory, sizeof(uint16_t), sizeof(memory), fp);
+	fclose(fp);
+
+	printf("Saved vm state to %s\n", fname);
+	return;
+}
+
+void load_state(char *fname) {
+	FILE *fp;
+	int i, skip;
+	uint16_t stacklen, n;
+
+	fname[strlen(fname) - 1] = 0;
+	printf("Loading vm state from %s\n", fname);
+
+	fp = fopen(fname, "rb");
+	fread(&OFFSET, sizeof(uint16_t), 1, fp);
+
+	stack_init(); // Yes, this leaks. No, I don't care
+	fread(&stacklen, sizeof(uint16_t), 1, fp);
+	for (i = 0; i < stacklen; i++) {
+		fread(&n, sizeof(uint16_t), 1, fp);
+		push(n);
+	}
+
+	fclose(fp);
+
+	skip = sizeof(uint16_t) * (stacklen + 1);
+	load_file_to_memory(fname, skip);
+	return;
+}
+
+void vm_shell(void) {
+	char buffer[1024] = {0};
+	int t;
+	getchar();
+
+	while (1) {
+		printf("vm> ");
+		fgets(buffer, sizeof(buffer), stdin);
+		if (!strncmp(buffer, "save", 4)) {
+			save_state((unsigned)time(NULL));
+		} else if (!strncmp(buffer, "load ", 4)) {
+			load_state(buffer + 5);
+			execute();
+		} else if (!strncmp(buffer, "exit", 4)) {
+			break;
+		} else {
+			printf("Invalid vm command\n");
+		}
+	}
+}
+
+int main(int argc, char *argv[]) {
+	if (argc < 2) {
+		printf("Usage: vm <binary>\n");
+		return 1;
+	}
+
+	load_file_to_memory(argv[1], 0);
+
+	OFFSET = 0;
 	stack_init();
 	execute();
 
@@ -274,7 +360,15 @@ void op_out(void) {
 }
 
 void op_in(void) {
-	setmem(getrarg(1), getchar());
+	char c = getchar();
+
+	if (c == '~') {
+		vm_shell();
+		setmem(getrarg(1), getchar());
+	} else {
+		setmem(getrarg(1), c);
+	}
+
 	OFFSET += 2;
 }
 
